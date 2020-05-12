@@ -239,17 +239,35 @@ endif
 
 cli: x264$(EXE)
 lib-static: $(LIBX264)
-lib-shared: $(SONAME)
+lib-shared: $(SONAME) $(IMPLIBNAME)
 
 $(LIBX264): $(GENERATED) .depend $(OBJS) $(OBJASM)
 	rm -f $(LIBX264)
 	$(AR)$@ $(OBJS) $(OBJASM)
 	$(if $(RANLIB), $(RANLIB) $@)
 
+ifeq ($(SYS),OS2)
+VENDOR ?=community
+BUILD_INFO=\#\#1\#\# $(shell date +'%d %b %Y %H:%M:%S')     $(shell uname -n)
+BUILDLEVEL_INFO=@\#$(VENDOR):0.$(API)\#@$(BUILD_INFO)::::0::
+OS2_DEF=libx264.def
+
+$(OS2_DEF):
+	@echo "LIBRARY x264$(API) INITINSTANCE TERMINSTANCE" > $@
+	@echo "DESCRIPTION \"$(BUILDLEVEL_INFO)@@libx264\"" >> $@
+	@echo "DATA MULTIPLE" >> $@
+
+$(SONAME): $(GENERATED) .depend $(OBJS) $(OBJASM) $(OBJSO) $(OS2_DEF)
+	$(LD)$@ $(OBJS) $(OBJASM) $(OBJSO) $(OS2_DEF) $(SOFLAGS) $(LDFLAGS)
+
+$(IMPLIBNAME): $(SONAME)
+	emximp -o $@ $(SONAME)
+else
 $(SONAME): $(GENERATED) .depend $(OBJS) $(OBJASM) $(OBJSO)
 	$(LD)$@ $(OBJS) $(OBJASM) $(OBJSO) $(SOFLAGS) $(LDFLAGS)
 
 $(IMPLIBNAME): $(SONAME)
+endif
 
 ifneq ($(EXE),)
 .PHONY: x264 checkasm8 checkasm10 example
@@ -401,7 +419,11 @@ install-lib-static: lib-static install-lib-dev
 
 install-lib-shared: lib-shared install-lib-dev
 	$(INSTALL) -d $(DESTDIR)$(libdir)
-ifneq ($(IMPLIBNAME),)
+ifeq ($(SYS),OS2)
+	$(INSTALL) -d $(DESTDIR)$(libdir)
+	$(INSTALL) -m 755 $(SONAME) $(DESTDIR)$(libdir)
+	$(INSTALL) -m 644 $(IMPLIBNAME) $(DESTDIR)$(libdir)
+else ifneq ($(IMPLIBNAME),)
 	$(INSTALL) -d $(DESTDIR)$(bindir)
 	$(INSTALL) -m 755 $(SONAME) $(DESTDIR)$(bindir)
 	$(INSTALL) -m 644 $(IMPLIBNAME) $(DESTDIR)$(libdir)
@@ -413,7 +435,9 @@ endif
 uninstall:
 	rm -f $(DESTDIR)$(includedir)/x264.h $(DESTDIR)$(includedir)/x264_config.h $(DESTDIR)$(libdir)/libx264.a
 	rm -f $(DESTDIR)$(bindir)/x264$(EXE) $(DESTDIR)$(libdir)/pkgconfig/x264.pc
-ifneq ($(IMPLIBNAME),)
+ifeq ($(SYS),OS2)
+	rm -f $(DESTDIR)$(libdir)/$(SONAME) $(DESTDIR)$(libdir)/$(IMPLIBNAME)
+else ifneq ($(IMPLIBNAME),)
 	rm -f $(DESTDIR)$(bindir)/$(SONAME) $(DESTDIR)$(libdir)/$(IMPLIBNAME)
 else ifneq ($(SONAME),)
 	rm -f $(DESTDIR)$(libdir)/$(SONAME) $(DESTDIR)$(libdir)/libx264.$(SOSUFFIX)
