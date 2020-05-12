@@ -35,6 +35,9 @@
 #include <windows.h>
 #include <io.h>       /* _setmode() */
 #include <fcntl.h>    /* _O_BINARY */
+#elif defined (__OS2__)
+#include <io.h>       /* setmode() */
+#include <fcntl.h>    /* O_BINARY */
 #endif
 
 #include <signal.h>
@@ -391,6 +394,13 @@ REALIGN_STACK int main( int argc, char **argv )
     _setmode( _fileno( stdin ),  _O_BINARY );
     _setmode( _fileno( stdout ), _O_BINARY );
     _setmode( _fileno( stderr ), _O_BINARY );
+#elif defined (__OS2__)
+    if (!isatty(fileno(stdin)))
+        setmode(fileno(stdin), O_BINARY);
+    if (!isatty(fileno(stdout)))
+        setmode(fileno(stdout), O_BINARY);
+    if (!isatty(fileno(stderr)))
+        setmode(fileno(stderr), O_BINARY);
 #endif
 
     /* Parse command line */

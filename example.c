@@ -23,7 +23,7 @@
  * For more information, contact us at licensing@x264.com.
  *****************************************************************************/
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OS2__)
 #include <io.h>       /* _setmode() */
 #include <fcntl.h>    /* _O_BINARY */
 #endif
@@ -58,6 +58,11 @@ int main( int argc, char **argv )
     _setmode( _fileno( stdin ),  _O_BINARY );
     _setmode( _fileno( stdout ), _O_BINARY );
     _setmode( _fileno( stderr ), _O_BINARY );
+#endif
+#ifdef __OS2__
+    setmode( fileno( stdin ),  O_BINARY );
+    setmode( fileno( stdout ), O_BINARY );
+    setmode( fileno( stderr ), O_BINARY );
 #endif
 
     FAIL_IF_ERROR( !(argc > 1), "Example usage: example 352x288 <input.yuv >output.h264\n" );
