@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if test x"$1" = x"-h" -o x"$1" = x"--help" ; then
 cat <<EOF
@@ -340,10 +340,22 @@ relative_path() {
     local path="$(cd "$1" >/dev/null; printf '%s/.' "${PWD%/}")"
     local up=''
 
-    while [[ $path != "$base/"* ]]; do
+    while true; do
+    case $path in
+      "$base/"*)
+        break
+      ;;
+      *)
         base="${base%/*}"
         up="../$up"
+      ;;
+    esac
     done
+
+#    while [ $path != "$base/"* ] ; do
+#        base="${base%/*}"
+#        up="../$up"
+#    done
 
     dirname "$up${path#"$base/"}"
 }
@@ -573,8 +585,10 @@ trap 'rm -rf conftest*' EXIT
 # test for use of compilers that require specific handling
 cc_base="$(basename "$CC")"
 QPRE="-"
-if [[ $host_os = mingw* || $host_os = cygwin* ]]; then
-    if [[ "$cc_base" = icl || "$cc_base" = icl[\ .]* ]]; then
+case $host_os in
+ mingw*|cygwin*)
+  case $cc_base in
+    icl | icl[\ .]* )
         # Windows Intel Compiler creates dependency generation with absolute Windows paths, Cygwin's make does not support Windows paths.
         [[ $host_os = cygwin* ]] && die "Windows Intel Compiler support requires MSYS"
         compiler=ICL
@@ -590,7 +604,8 @@ if [[ $host_os = mingw* || $host_os = cygwin* ]]; then
         if cc_check '' -Qdiag-error:10006,10157 ; then
             CHECK_CFLAGS="$CHECK_CFLAGS -Qdiag-error:10006,10157"
         fi
-    elif [[ "$cc_base" = cl || "$cc_base" = cl[\ .]* ]]; then
+    ;;
+    cl | cl[\ .]* )
         # Standard Microsoft Visual Studio
         compiler=CL
         compiler_style=MS
@@ -605,16 +620,20 @@ if [[ $host_os = mingw* || $host_os = cygwin* ]]; then
         elif cpp_check '' '' 'defined(_M_ARM)' ; then
             host_cpu=arm
         fi
-    else
+    ;;
+    *)
         # MinGW uses broken pre-VS2015 Microsoft printf functions unless it's told to use the POSIX ones.
         CFLAGS="$CFLAGS -D_POSIX_C_SOURCE=200112L"
-    fi
-else
-    if [[ "$cc_base" = icc || "$cc_base" = icc[\ .]* ]]; then
+    ;;
+    esac
+ ;;
+ *)
+    if (test "$cc_base" = icc -o "$cc_base" = icc[\ .]* ); then
         AR="xiar"
         compiler=ICC
     fi
-fi
+ ;;
+esac
 
 if [ $compiler = GNU ]; then
     if cc_check '' -Werror=unknown-warning-option ; then
@@ -713,6 +732,11 @@ case $host_os in
     *haiku*)
         SYS="HAIKU"
         ;;
+    os2*)
+        EXE=".exe"
+        SYS="OS2"
+        define HAVE_MALLOC_H
+        ;;
     *)
         die "Unknown system $host, edit the configure"
         ;;
@@ -728,10 +752,10 @@ case $host_cpu in
         AS_EXT=".asm"
         ASFLAGS="$ASFLAGS -DARCH_X86_64=0 -I\$(SRCPATH)/common/x86/"
         if [ $compiler = GNU ]; then
-            if [[ "$asm" == auto && "$CFLAGS" != *-march* ]]; then
+            if (test "$asm" = auto -a "$CFLAGS" != *-march* ); then
                 CFLAGS="$CFLAGS -march=i686"
             fi
-            if [[ "$asm" == auto && "$CFLAGS" != *-mfpmath* ]]; then
+            if (test "$asm" = auto -a "$CFLAGS" != *-mfpmath* ); then
                 CFLAGS="$CFLAGS -mfpmath=sse -msse -msse2"
             fi
             CFLAGS="-m32 $CFLAGS"
@@ -744,6 +768,8 @@ case $host_cpu in
             LDFLAGS="$LDFLAGS -Wl,--large-address-aware"
             [ $compiler = GNU ] && LDFLAGS="$LDFLAGS -Wl,--dynamicbase,--nxcompat,--tsaware"
             [ $compiler = GNU ] && RCFLAGS="--target=pe-i386 $RCFLAGS"
+        elif [ "$SYS" = OS2 ]; then
+            ASFLAGS="$ASFLAGS -f aout -DPREFIX"
         else
             ASFLAGS="$ASFLAGS -f elf32"
         fi
@@ -1548,6 +1574,12 @@ if [ "$shared" = "yes" ]; then
         echo "SOSUFFIX=so" >> config.mak
         echo "SONAME=libx264.so.$API" >> config.mak
         echo "SOFLAGS=-shared -Wl,-h,\$(SONAME) $SOFLAGS" >> config.mak
+    elif [ "$SYS" = "OS2" ]; then
+        echo "SOSUFFIX=dll" >> config.mak
+        echo "SONAME=x264$API.dll" >> config.mak
+        echo 'IMPLIBNAME=libx264_dll.a' >> config.mak
+        echo "SOFLAGS=-Zdll $SOFLAGS" >> config.mak
+        echo "API=$API" >> config.mak
     else
         echo "SOSUFFIX=so" >> config.mak
         echo "SONAME=libx264.so.$API" >> config.mak
@@ -1611,7 +1643,7 @@ cat conftest.log >> config.log
 cat conftest.log
 
 [ "$SRCPATH" != "." ] && ln -sf ${SRCPATH}/Makefile ./Makefile
-mkdir -p common/{aarch64,arm,mips,ppc,x86} encoder extras filters/video input output tools
+mkdir -p common/aarch64 common/arm common/mips common/ppc common/x86 encoder extras filters/video input output tools
 
 echo
 echo "You can run 'make' or 'make fprofiled' now."
