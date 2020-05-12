@@ -53,7 +53,11 @@ extern "C" {
 #else
 #   if defined(__GNUC__) && (__GNUC__ >= 4)
 #       define X264_DLL_IMPORT
+#     ifdef __OS2__
+#       define X264_DLL_EXPORT __declspec(dllexport)
+#     else
 #       define X264_DLL_EXPORT __attribute__((visibility("default")))
+#     endif
 #   else
 #       define X264_DLL_IMPORT
 #       define X264_DLL_EXPORT
