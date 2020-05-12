@@ -42,6 +42,10 @@
 #include <sys/sysctl.h>
 #include <machine/cpu.h>
 #endif
+#if SYS_OS2
+#define INCL_DOS
+#include <os2emx.h>
+#endif
 
 const x264_cpu_name_t x264_cpu_names[] =
 {
@@ -473,6 +477,11 @@ int x264_cpu_num_processors( void )
         ncpu = 1;
     }
     return ncpu;
+
+#elif defined(SYS_OS2)
+    ULONG numprocs = 1;
+    DosQuerySysInfo(QSV_NUMPROCESSORS, QSV_NUMPROCESSORS, &numprocs, sizeof(numprocs));
+    return numprocs;
 
 #else
     return 1;
